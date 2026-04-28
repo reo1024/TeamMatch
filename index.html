@@ -1443,7 +1443,18 @@ function nextPeriod() {
 }
 
 function saveGame() {
-  scheduleSave(); stopMatchTimer(); stopBreakTimer(); showPage('matches'); }
+  const game = state.activeGame;
+  if (game) {
+    // スコア未入力なら0-0として保存
+    if (!state.scores[game.id]) state.scores[game.id] = {};
+    if (!state.scores[game.id].s1) state.scores[game.id].s1 = '0';
+    if (!state.scores[game.id].s2) state.scores[game.id].s2 = '0';
+  }
+  scheduleSave();
+  stopMatchTimer();
+  stopBreakTimer();
+  showPage('matches');
+}
 
 // ── Match Timer ───────────────────────────────────────────
 function toggleMatchTimer() { matchTimer.running?stopMatchTimer():startMatchTimer(); }
