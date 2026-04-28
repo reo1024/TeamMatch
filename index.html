@@ -287,6 +287,15 @@
     .timer-display { font-size: 56px; }
     .break-timer-display { font-size: 36px; }
     .sport-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+    .big-score-input { font-size: 36px; width: 68px; }
+    .score-team-name { font-size: 15px; }
+    .score-controls button { font-size: 22px !important; padding: 0 10px !important; }
+    .score-teams { gap: 10px; }
+  }
+  @media (max-width: 380px) {
+    .big-score-input { font-size: 30px; width: 58px; }
+    .score-controls button { font-size: 20px !important; padding: 0 8px !important; }
+    .score-teams { gap: 6px; }
   }
 
   /* ── Member management (settings) ── */
@@ -1066,11 +1075,13 @@ function renameTeam(id, name) {
   if (!name) { renderTeamList(); return; }
   const team = state.teams.find(t => t.id === id);
   if (team) team.name = name;
+  scheduleSave();
 }
 
 function removeTeam(id) {
   state.teams = state.teams.filter(t => t.id!==id);
   renderTeamList();
+  scheduleSave();
 }
 
 function toggleMembers(teamId) {
@@ -1142,6 +1153,7 @@ function generate() {
   state.memberStats = {};
   document.getElementById('nav-matches').style.display = '';
   showPage('matches');
+  scheduleSave();
 }
 
 function reshuffleTournament() {
@@ -1398,7 +1410,7 @@ function syncScoreInputs() {
   }
 }
 
-function onScoreInput(side,val) { setScore(state.activeGame.id,side===0?'s1':'s2',val); }
+function onScoreInput(side,val) { setScore(state.activeGame.id,side===0?'s1':'s2',val); scheduleSave(); }
 
 function onPeriodInput(period,side,val) {
   setPeriodScore(state.activeGame.id,period,side,val);
@@ -1430,7 +1442,8 @@ function nextPeriod() {
   }
 }
 
-function saveGame() { stopMatchTimer(); stopBreakTimer(); showPage('matches'); }
+function saveGame() {
+  scheduleSave(); stopMatchTimer(); stopBreakTimer(); showPage('matches'); }
 
 // ── Match Timer ───────────────────────────────────────────
 function toggleMatchTimer() { matchTimer.running?stopMatchTimer():startMatchTimer(); }
@@ -1481,9 +1494,71 @@ function updateBreakTimerDisplay() { const el=document.getElementById('break-tim
 // ── Utility ───────────────────────────────────────────────
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── Persistence (localStorage, 1日期限) ──────────────────
+const STORAGE_KEY = 'match_app_state';
+const STORAGE_TTL = 24 * 60 * 60 * 1000; // 1日
+
+function saveState() {
+  try {
+    const payload = {
+      ts: Date.now(),
+      mode: state.mode,
+      sport: state.sport.id,
+      customMinutes: state.customMinutes,
+      customPeriods: state.customPeriods,
+      breakMinutes: state.breakMinutes,
+      gamesPerRound: state.gamesPerRound,
+      teams: state.teams,
+      rounds: state.rounds,
+      scores: state.scores,
+      memberStats: state.memberStats,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (!p.ts || Date.now() - p.ts > STORAGE_TTL) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    state.mode = p.mode ?? state.mode;
+    const sport = SPORTS.find(s => s.id === p.sport);
+    if (sport) state.sport = sport;
+    state.customMinutes = p.customMinutes ?? state.customMinutes;
+    state.customPeriods = p.customPeriods ?? state.customPeriods;
+    state.breakMinutes  = p.breakMinutes  ?? state.breakMinutes;
+    state.gamesPerRound = p.gamesPerRound ?? state.gamesPerRound;
+    if (Array.isArray(p.teams))  state.teams  = p.teams;
+    if (Array.isArray(p.rounds)) state.rounds = p.rounds;
+    if (p.scores)      state.scores      = p.scores;
+    if (p.memberStats) state.memberStats = p.memberStats;
+  } catch(e) {}
+}
+
+// 状態変化のたびに保存（デバウンス）
+let _saveTid = null;
+function scheduleSave() {
+  clearTimeout(_saveTid);
+  _saveTid = setTimeout(saveState, 500);
+}
+
 // ── Init ──────────────────────────────────────────────────
+loadState();
 renderSportGrid();
 renderTeamList();
+// ロード後にUIを同期
+if (state.rounds.length) {
+  document.getElementById('nav-matches').style.display = '';
+}
+document.getElementById('mode-league').classList.toggle('active', state.mode==='league');
+document.getElementById('mode-tournament').classList.toggle('active', state.mode==='tournament');
+document.getElementById('courts-input').value = state.gamesPerRound;
+updateCourtsLabel();
 </script>
 </body>
 </html>
