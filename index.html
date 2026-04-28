@@ -1400,13 +1400,13 @@ function syncScoreInputs() {
   const game=state.activeGame;
   if(!game) return;
   if(hasPeriods()) {
-    document.getElementById('score-input-0').value = getPeriodScore(game.id,state.currentPeriod-1,0);
-    document.getElementById('score-input-1').value = getPeriodScore(game.id,state.currentPeriod-1,1);
+    document.getElementById('score-input-0').value = getPeriodScore(game.id,state.currentPeriod-1,0) || '0';
+    document.getElementById('score-input-1').value = getPeriodScore(game.id,state.currentPeriod-1,1) || '0';
     document.getElementById('total-val-0').textContent = getScore(game.id,'s1')||'0';
     document.getElementById('total-val-1').textContent = getScore(game.id,'s2')||'0';
   } else {
-    document.getElementById('score-input-0').value = getScore(game.id,'s1');
-    document.getElementById('score-input-1').value = getScore(game.id,'s2');
+    document.getElementById('score-input-0').value = getScore(game.id,'s1') || '0';
+    document.getElementById('score-input-1').value = getScore(game.id,'s2') || '0';
   }
 }
 
@@ -1466,7 +1466,20 @@ function stopMatchTimer() {
   clearInterval(matchTimer.interval); matchTimer.running=false;
   const btn=document.getElementById('match-timer-btn'); if(btn) btn.textContent='▶ スタート';
 }
-function resetMatchTimer() { stopMatchTimer(); matchTimer.seconds=timerSecs(); updateMatchTimerDisplay(); }
+function resetMatchTimer() {
+  stopMatchTimer();
+  matchTimer.seconds = timerSecs();
+  updateMatchTimerDisplay();
+  // スコアもリセット
+  const game = state.activeGame;
+  if (game) {
+    delete state.scores[game.id];
+    state.currentPeriod = 1;
+    syncScoreInputs();
+    renderGame();
+    scheduleSave();
+  }
+}
 function updateMatchTimerDisplay() {
   const el=document.getElementById('match-timer'); if(!el) return;
   el.textContent=fmt(matchTimer.seconds);
